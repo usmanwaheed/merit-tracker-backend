@@ -1,27 +1,22 @@
 // src/modules/auth/auth.service.ts
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { User, UserRole } from '../../entities/user.entity';
-import { Company, SubscriptionStatus } from '../../entities/company.entity';
+import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterCompanyDto, RegisterUserDto, LoginDto } from './dto/auth.dto';
+import { UserRole, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
     constructor(
-        @InjectRepository(User)
-        private usersRepository: Repository<User>,
-        @InjectRepository(Company)
-        private companiesRepository: Repository<Company>,
+        private prisma: PrismaService,
         private jwtService: JwtService,
     ) { }
 
     async validateUser(email: string, password: string): Promise<any> {
-        const user = await this.usersRepository.findOne({
+        const user = await this.prisma.user.findUnique({
             where: { email },
-            relations: ['company'],
+            include: { company: true },
         });
 
         if (!user) {
@@ -55,6 +50,8 @@ export class AuthService {
             companyId: user.companyId,
         };
 
+        const subscriptionStatus = await this.getSubscriptionStatus(user.companyId);
+
         return {
             access_token: this.jwtService.sign(payload),
             user: {
@@ -64,69 +61,86 @@ export class AuthService {
                 lastName: user.lastName,
                 role: user.role,
                 companyId: user.companyId,
+                avatar: user.avatar,
+                points: user.points,
             },
+            company: {
+                id: user.company.id,
+                name: user.company.name,
+                logo: user.company.logo,
+                companyCode: user.company.companyCode, // Add this line
+            },
+            subscription: subscriptionStatus,
         };
     }
 
     async registerCompany(registerDto: RegisterCompanyDto) {
-        // Check if email exists
-        const existingUser = await this.usersRepository.findOne({
+        const existingUser = await this.prisma.user.findUnique({
             where: { email: registerDto.email },
         });
         if (existingUser) {
             throw new ConflictException('Email already exists');
         }
 
-        // Check if company name exists
-        const existingCompany = await this.companiesRepository.findOne({
+        const existingCompany = await this.prisma.company.findUnique({
             where: { name: registerDto.companyName },
         });
         if (existingCompany) {
             throw new ConflictException('Company name already exists');
         }
 
-        // Generate unique company code
-        const companyCode = this.generateCompanyCode();
-
-        // Create company
-        const company = this.companiesRepository.create({
-            name: registerDto.companyName,
-            companyCode,
-            subscriptionStatus: SubscriptionStatus.TRIAL,
-            trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
-            isActive: true,
-        });
-        await this.companiesRepository.save(company);
-
-        // Hash password
+        const companyCode = await this.generateUniqueCompanyCode();
         const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-        // Create company admin user
-        const user = this.usersRepository.create({
-            email: registerDto.email,
-            password: hashedPassword,
-            firstName: registerDto.firstName,
-            lastName: registerDto.lastName,
-            role: UserRole.COMPANY_ADMIN,
-            companyId: company.id,
-            isActive: true,
-        });
-        await this.usersRepository.save(user);
+        const result = await this.prisma.$transaction(async (prisma) => {
+            const company = await prisma.company.create({
+                data: {
+                    name: registerDto.companyName,
+                    companyCode,
+                    subscriptionStatus: SubscriptionStatus.TRIAL,
+                    trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+                    isActive: true,
+                },
+            });
 
-        return this.login({ email: user.email, password: registerDto.password });
+            const user = await prisma.user.create({
+                data: {
+                    email: registerDto.email,
+                    password: hashedPassword,
+                    firstName: registerDto.firstName,
+                    lastName: registerDto.lastName,
+                    role: UserRole.COMPANY_ADMIN,
+                    companyId: company.id,
+                    isActive: true,
+                    phone: registerDto.phone,
+                },
+            });
+
+            return { company, user };
+        });
+
+        // Get the login response first
+        const loginResponse = await this.login({
+            email: result.user.email,
+            password: registerDto.password
+        });
+
+        // Add companyCode to the response
+        return {
+            ...loginResponse,
+            companyCode: result.company.companyCode // Add this line
+        };
     }
 
     async registerUser(registerDto: RegisterUserDto) {
-        // Check if email exists
-        const existingUser = await this.usersRepository.findOne({
+        const existingUser = await this.prisma.user.findUnique({
             where: { email: registerDto.email },
         });
         if (existingUser) {
             throw new ConflictException('Email already exists');
         }
 
-        // Verify company code
-        const company = await this.companiesRepository.findOne({
+        const company = await this.prisma.company.findUnique({
             where: { companyCode: registerDto.companyCode },
         });
         if (!company) {
@@ -137,30 +151,153 @@ export class AuthService {
             throw new BadRequestException('Company is not active');
         }
 
-        // Hash password
+        const now = new Date();
+        const isSubscriptionValid = this.checkSubscriptionValid(company, now);
+
+        if (!isSubscriptionValid) {
+            throw new BadRequestException('Company subscription has expired. Please contact your administrator.');
+        }
+
         const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-        // Create user
-        const user = this.usersRepository.create({
-            email: registerDto.email,
-            password: hashedPassword,
-            firstName: registerDto.firstName,
-            lastName: registerDto.lastName,
-            role: UserRole.USER,
-            companyId: company.id,
-            isActive: true,
+        await this.prisma.user.create({
+            data: {
+                email: registerDto.email,
+                password: hashedPassword,
+                firstName: registerDto.firstName,
+                lastName: registerDto.lastName,
+                role: UserRole.USER,
+                companyId: company.id,
+                isActive: true,
+                phone: registerDto.phone,
+            },
         });
-        await this.usersRepository.save(user);
 
-        return this.login({ email: user.email, password: registerDto.password });
+        return this.login({ email: registerDto.email, password: registerDto.password });
     }
 
-    private generateCompanyCode(): string {
+    async getProfile(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                company: {
+                    select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                        companyCode: true,
+                        subscriptionStatus: true,
+                        trialEndsAt: true,
+                        subscriptionEndsAt: true,
+                    },
+                },
+                department: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const { password: _, ...result } = user;
+        return result;
+    }
+
+    async getSubscriptionStatus(companyId: string) {
+        const company = await this.prisma.company.findUnique({
+            where: { id: companyId },
+            select: {
+                subscriptionStatus: true,
+                trialEndsAt: true,
+                subscriptionEndsAt: true,
+                isActive: true,
+            },
+        });
+
+        if (!company) {
+            throw new NotFoundException('Company not found');
+        }
+
+        const now = new Date();
+        const isValid = this.checkSubscriptionValid(company, now);
+
+        let daysRemaining = 0;
+        let message = '';
+
+        switch (company.subscriptionStatus) {
+            case SubscriptionStatus.TRIAL:
+                if (company.trialEndsAt) {
+                    daysRemaining = Math.max(0, Math.ceil((company.trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+                    message = daysRemaining > 0
+                        ? `Trial expires in ${daysRemaining} day(s)`
+                        : 'Trial has expired';
+                }
+                break;
+            case SubscriptionStatus.ACTIVE:
+                if (company.subscriptionEndsAt) {
+                    daysRemaining = Math.max(0, Math.ceil((company.subscriptionEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+                    message = `Subscription renews in ${daysRemaining} day(s)`;
+                } else {
+                    message = 'Active subscription';
+                }
+                break;
+            case SubscriptionStatus.EXPIRED:
+                message = 'Subscription has expired';
+                break;
+            case SubscriptionStatus.CANCELLED:
+                message = 'Subscription has been cancelled';
+                break;
+        }
+
+        return {
+            status: company.subscriptionStatus,
+            isValid,
+            daysRemaining,
+            message,
+            trialEndsAt: company.trialEndsAt,
+            subscriptionEndsAt: company.subscriptionEndsAt,
+        };
+    }
+
+    private checkSubscriptionValid(company: any, now: Date): boolean {
+        switch (company.subscriptionStatus) {
+            case SubscriptionStatus.TRIAL:
+                return company.trialEndsAt ? company.trialEndsAt > now : true;
+            case SubscriptionStatus.ACTIVE:
+                return company.subscriptionEndsAt ? company.subscriptionEndsAt > now : true;
+            case SubscriptionStatus.EXPIRED:
+            case SubscriptionStatus.CANCELLED:
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    private async generateUniqueCompanyCode(): Promise<string> {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let code = '';
-        for (let i = 0; i < 8; i++) {
-            code += characters.charAt(Math.floor(Math.random() * characters.length));
+        let isUnique = false;
+
+        while (!isUnique) {
+            code = '';
+            for (let i = 0; i < 8; i++) {
+                code += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+
+            const existing = await this.prisma.company.findUnique({
+                where: { companyCode: code },
+            });
+
+            if (!existing) {
+                isUnique = true;
+            }
         }
+
         return code;
     }
 }

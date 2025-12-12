@@ -2,7 +2,8 @@
 // src/modules/users/dto/users.dto.ts
 import { IsString, IsOptional, IsEmail, IsEnum, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '../../../entities/user.entity';
+import { UserRole } from '@prisma/client';
+// import { UserRole } from '../../../entities/user.entity';
 
 export class UpdateUserDto {
     @ApiProperty({ required: false })

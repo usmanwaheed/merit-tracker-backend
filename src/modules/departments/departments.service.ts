@@ -1,46 +1,48 @@
 // src/modules/departments/departments.service.ts
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Department } from '../../entities/department.entity';
-import { User, UserRole } from '../../entities/user.entity';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
 import { CreateDepartmentDto, UpdateDepartmentDto, AssignUsersDto } from './dto/departments.dto';
-import { In } from 'typeorm';
 
 @Injectable()
 export class DepartmentsService {
-    constructor(
-        @InjectRepository(Department)
-        private departmentsRepository: Repository<Department>,
-        @InjectRepository(User)
-        private usersRepository: Repository<User>,
-    ) { }
+    constructor(private prisma: PrismaService) { }
 
-    async create(createDto: CreateDepartmentDto, currentUser: User): Promise<Department> {
-        if (currentUser.role === UserRole.USER) {
+    async create(createDto: CreateDepartmentDto, currentUserRole: UserRole, companyId: string) {
+        if (currentUserRole === UserRole.USER) {
             throw new ForbiddenException('Insufficient permissions to create department');
         }
 
-        const department = this.departmentsRepository.create({
-            ...createDto,
-            companyId: currentUser.companyId,
+        return this.prisma.department.create({
+            data: {
+                ...createDto,
+                companyId,
+            },
+            include: {
+                lead: true,
+                users: true,
+            },
         });
-
-        return this.departmentsRepository.save(department);
     }
 
-    async findAll(companyId: string): Promise<Department[]> {
-        return this.departmentsRepository.find({
+    async findAll(companyId: string) {
+        return this.prisma.department.findMany({
             where: { companyId },
-            relations: ['lead', 'users'],
-            order: { createdAt: 'DESC' },
+            include: {
+                lead: true,
+                users: true,
+            },
+            orderBy: { createdAt: 'desc' },
         });
     }
 
-    async findOne(id: string, companyId: string): Promise<Department> {
-        const department = await this.departmentsRepository.findOne({
+    async findOne(id: string, companyId: string) {
+        const department = await this.prisma.department.findFirst({
             where: { id, companyId },
-            relations: ['lead', 'users'],
+            include: {
+                lead: true,
+                users: true,
+            },
         });
 
         if (!department) {
@@ -50,45 +52,55 @@ export class DepartmentsService {
         return department;
     }
 
-    async update(id: string, updateDto: UpdateDepartmentDto, currentUser: User): Promise<Department> {
-        if (currentUser.role === UserRole.USER) {
+    async update(id: string, updateDto: UpdateDepartmentDto, currentUserRole: UserRole, companyId: string) {
+        if (currentUserRole === UserRole.USER) {
             throw new ForbiddenException('Insufficient permissions to update department');
         }
 
-        const department = await this.findOne(id, currentUser.companyId);
-        Object.assign(department, updateDto);
-        return this.departmentsRepository.save(department);
+        await this.findOne(id, companyId);
+
+        return this.prisma.department.update({
+            where: { id },
+            data: updateDto,
+            include: {
+                lead: true,
+                users: true,
+            },
+        });
     }
 
-    async assignUsers(id: string, assignDto: AssignUsersDto, currentUser: User): Promise<Department> {
-        if (currentUser.role === UserRole.USER) {
+    async assignUsers(id: string, assignDto: AssignUsersDto, currentUserRole: UserRole, companyId: string) {
+        if (currentUserRole === UserRole.USER) {
             throw new ForbiddenException('Insufficient permissions to assign users');
         }
 
-        const department = await this.findOne(id, currentUser.companyId);
+        const department = await this.findOne(id, companyId);
 
-        // Update users with new department
-        await this.usersRepository.update(
-            { id: In(assignDto.userIds), companyId: currentUser.companyId },
-            { departmentId: department.id },
-        );
+        await this.prisma.user.updateMany({
+            where: {
+                id: { in: assignDto.userIds },
+                companyId,
+            },
+            data: { departmentId: department.id },
+        });
 
-        return this.findOne(id, currentUser.companyId);
+        return this.findOne(id, companyId);
     }
 
-    async delete(id: string, currentUser: User): Promise<void> {
-        if (currentUser.role !== UserRole.COMPANY_ADMIN) {
+    async delete(id: string, currentUserRole: UserRole, companyId: string) {
+        if (currentUserRole !== UserRole.COMPANY_ADMIN) {
             throw new ForbiddenException('Only company admin can delete departments');
         }
 
-        const department = await this.findOne(id, currentUser.companyId);
+        const department = await this.findOne(id, companyId);
 
-        // Remove department from users
-        await this.usersRepository.update(
-            { departmentId: department.id },
-            { departmentId: '' },
-        );
+        await this.prisma.user.updateMany({
+            where: { departmentId: department.id },
+            data: { departmentId: null },
+        });
 
-        await this.departmentsRepository.remove(department);
+        await this.prisma.department.delete({
+            where: { id },
+        });
     }
 }

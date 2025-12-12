@@ -1,12 +1,11 @@
-
 // src/modules/time-tracking/time-tracking.controller.ts
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TimeTrackingService } from './time-tracking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../../entities/user.entity';
-import { StartTrackingDto, StopTrackingDto, AddScreenshotDto } from './dto/time-tracking.dto';
+// import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { StartTimeTrackingDto, StopTimeTrackingDto, UpdateTimeTrackingDto, AddScreenshotDto, TimeTrackingQueryDto, ManualTimeEntryDto } from './dto/time-tracking.dto';
+import { CurrentUser } from '../auth/guards';
 
 @ApiTags('time-tracking')
 @Controller('time-tracking')
@@ -16,52 +15,80 @@ export class TimeTrackingController {
     constructor(private readonly timeTrackingService: TimeTrackingService) { }
 
     @Post('start')
-    @ApiOperation({ summary: 'Start time tracking' })
-    async startTracking(@Body() startDto: StartTrackingDto, @CurrentUser() user: User) {
-        return this.timeTrackingService.startTracking(startDto, user);
+    @ApiOperation({ summary: 'Start time tracking for a task' })
+    async start(@Body() dto: StartTimeTrackingDto, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.start(dto, userId, role as any, companyId);
     }
 
-    @Patch(':id/stop')
-    @ApiOperation({ summary: 'Stop time tracking' })
-    async stopTracking(
-        @Param('id') id: string,
-        @Body() stopDto: StopTrackingDto,
-        @CurrentUser() user: User,
-    ) {
-        return this.timeTrackingService.stopTracking(id, stopDto, user);
+    @Post(':id/stop')
+    @ApiOperation({ summary: 'Stop specific time tracking session' })
+    async stop(@Param('id') id: string, @Body() dto: StopTimeTrackingDto, @CurrentUser('id') userId: string) {
+        return this.timeTrackingService.stop(id, dto, userId);
     }
 
-    @Patch(':id/screenshot')
-    @ApiOperation({ summary: 'Add screenshot to tracking session' })
-    async addScreenshot(
-        @Param('id') id: string,
-        @Body() screenshotDto: AddScreenshotDto,
-        @CurrentUser() user: User,
-    ) {
-        return this.timeTrackingService.addScreenshot(id, screenshotDto, user);
+    @Post('stop-active')
+    @ApiOperation({ summary: 'Stop current active timer (works from any device)' })
+    async stopActive(@Body() dto: StopTimeTrackingDto, @CurrentUser('id') userId: string) {
+        return this.timeTrackingService.stopActive(dto, userId);
     }
 
     @Get('active')
-    @ApiOperation({ summary: 'Get my active tracking session' })
-    async getMyActiveTracking(@CurrentUser() user: User) {
-        return this.timeTrackingService.getMyActiveTracking(user);
+    @ApiOperation({ summary: 'Get current active timer status (for cross-device sync)' })
+    async getActiveTimer(@CurrentUser('id') userId: string) {
+        return this.timeTrackingService.getActiveTimer(userId);
     }
 
-    @Get('history')
-    @ApiOperation({ summary: 'Get my tracking history' })
-    async getMyHistory(
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string,
-        @CurrentUser() user: User,
-    ) {
-        const start = startDate ? new Date(startDate) : undefined;
-        const end = endDate ? new Date(endDate) : undefined;
-        return this.timeTrackingService.getMyTrackingHistory(user, start, end);
+    @Get()
+    @ApiOperation({ summary: 'Get time tracking history' })
+    async findAll(@Query() query: TimeTrackingQueryDto, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.findAll(query, userId, role as any, companyId);
     }
 
-    @Get('project/:projectId')
-    @ApiOperation({ summary: 'Get project time tracking' })
-    async getProjectTracking(@Param('projectId') projectId: string, @CurrentUser() user: User) {
-        return this.timeTrackingService.getProjectTimeTracking(projectId, user.companyId);
+    @Get('my-summary')
+    @ApiOperation({ summary: 'Get current user time tracking summary' })
+    async getMySummary(@CurrentUser('id') userId: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.getUserSummary(userId, companyId);
+    }
+
+    @Get('user/:userId/summary')
+    @ApiOperation({ summary: 'Get user time tracking summary (admin only)' })
+    async getUserSummary(@Param('userId') targetUserId: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.getUserSummary(targetUserId, companyId);
+    }
+
+    @Get('project/:projectId/summary')
+    @ApiOperation({ summary: 'Get project time tracking summary' })
+    async getProjectSummary(@Param('projectId') projectId: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.getProjectSummary(projectId, companyId);
+    }
+
+    @Get(':id')
+    @ApiOperation({ summary: 'Get time tracking entry by ID' })
+    async findOne(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.findOne(id, userId, role as any, companyId);
+    }
+
+    @Put(':id')
+    @ApiOperation({ summary: 'Update time tracking entry' })
+    async update(@Param('id') id: string, @Body() dto: UpdateTimeTrackingDto, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.update(id, dto, userId, role as any, companyId);
+    }
+
+    @Patch(':id/screenshot')
+    @ApiOperation({ summary: 'Add screenshot to active timer' })
+    async addScreenshot(@Param('id') id: string, @Body() dto: AddScreenshotDto, @CurrentUser('id') userId: string) {
+        return this.timeTrackingService.addScreenshot(id, dto, userId);
+    }
+
+    @Post('manual')
+    @ApiOperation({ summary: 'Create manual time entry (admin only)' })
+    async createManualEntry(@Body() dto: ManualTimeEntryDto, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.createManualEntry(dto, userId, role as any, companyId);
+    }
+
+    @Delete(':id')
+    @ApiOperation({ summary: 'Delete time tracking entry' })
+    async delete(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string, @CurrentUser('companyId') companyId: string) {
+        return this.timeTrackingService.delete(id, userId, role as any, companyId);
     }
 }

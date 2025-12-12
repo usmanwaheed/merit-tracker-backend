@@ -1,72 +1,35 @@
 // src/modules/sops/dto/sops.dto.ts
-import { IsString, IsEnum, IsOptional, IsNumber, IsArray } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { SopType } from '../../../entities/sop.entity';
+import { IsString, IsOptional, IsEnum, IsArray, IsNumber, IsNotEmpty, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SopType, SopStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateSopDto {
-    @ApiProperty()
-    @IsString()
-    title: string;
-
-    @ApiProperty({ required: false })
-    @IsString()
-    @IsOptional()
-    description?: string;
-
-    @ApiProperty({ enum: SopType })
-    @IsEnum(SopType)
-    type: SopType;
-
-    @ApiProperty()
-    @IsString()
-    fileUrl: string;
-
-    @ApiProperty({ required: false })
-    @IsString()
-    @IsOptional()
-    thumbnailUrl?: string;
-
-    @ApiProperty({ required: false })
-    @IsNumber()
-    @IsOptional()
-    duration?: number;
-
-    @ApiProperty({ type: [String], required: false })
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    tags?: string[];
+    @ApiProperty() @IsString() @IsNotEmpty() title: string;
+    @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+    @ApiProperty({ enum: SopType }) @IsEnum(SopType) type: SopType;
+    @ApiProperty() @IsString() @IsNotEmpty() fileUrl: string;
+    @ApiPropertyOptional() @IsOptional() @IsString() thumbnailUrl?: string;
+    @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) duration?: number;
+    @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }
 
 export class UpdateSopDto {
-    @ApiProperty({ required: false })
-    @IsString()
-    @IsOptional()
-    title?: string;
-
-    @ApiProperty({ required: false })
-    @IsString()
-    @IsOptional()
-    description?: string;
-
-    @ApiProperty({ required: false })
-    @IsString()
-    @IsOptional()
-    thumbnailUrl?: string;
-
-    @ApiProperty({ type: [String], required: false })
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    tags?: string[];
+    @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+    @ApiPropertyOptional({ enum: SopType }) @IsOptional() @IsEnum(SopType) type?: SopType;
+    @ApiPropertyOptional() @IsOptional() @IsString() fileUrl?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString() thumbnailUrl?: string;
+    @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) duration?: number;
+    @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }
 
-export class ApproveSopDto {
-    // Can add optional fields like approval notes if needed
-}
+export class ApproveSopDto { @ApiPropertyOptional() @IsOptional() @IsString() notes?: string; }
+export class RejectSopDto { @ApiProperty() @IsString() @IsNotEmpty() rejectionReason: string; }
 
-export class RejectSopDto {
-    @ApiProperty()
-    @IsString()
-    reason: string;
+export class SopQueryDto {
+    @ApiPropertyOptional({ enum: SopType }) @IsOptional() @IsEnum(SopType) type?: SopType;
+    @ApiPropertyOptional({ enum: SopStatus }) @IsOptional() @IsEnum(SopStatus) status?: SopStatus;
+    @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
+    @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }

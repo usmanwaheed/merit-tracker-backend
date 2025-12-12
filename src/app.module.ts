@@ -1,46 +1,45 @@
 // src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+import { APP_GUARD } from '@nestjs/core';
+import { PrismaModule } from './prisma/prisma.module';
+import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { ProjectsModule } from './modules/projects/projects.module';
-import { SopsModule } from './modules/sops/sops.module';
+import { SubProjectsModule } from './modules/sub-projects/sub-projects.module';
 import { TimeTrackingModule } from './modules/time-tracking/time-tracking.module';
-import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SopsModule } from './modules/sops/sops.module';
 import { ChatModule } from './modules/chat/chat.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { SubscriptionGuard } from './modules/auth/guards';
+// import { SubscriptionGuard } from './common/guards/subscription.guard';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT!) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_NAME || 'merit_tracker',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: process.env.NODE_ENV !== 'production', // Disable in production
-      logging: process.env.NODE_ENV === 'development',
-    }),
-    ScheduleModule.forRoot(),
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    SupabaseModule,
     AuthModule,
     UsersModule,
     CompaniesModule,
     DepartmentsModule,
     ProjectsModule,
-    SopsModule,
+    SubProjectsModule,
     TimeTrackingModule,
-    NotificationsModule,
+    SopsModule,
     ChatModule,
-    AnalyticsModule,
+    NotificationsModule,
+    ActivityLogsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: SubscriptionGuard,
+    },
   ],
 })
 export class AppModule { }

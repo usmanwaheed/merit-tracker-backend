@@ -7,13 +7,12 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    // origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: 'http://localhost:3000',
     credentials: true,
   });
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -22,17 +21,33 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger documentation
   const config = new DocumentBuilder()
     .setTitle('Merit Tracker API')
-    .setDescription('Complete API for Merit Tracker Application')
+    .setDescription('Complete backend API for Merit Tracking Application')
     .setVersion('1.0')
     .addBearerAuth()
+    .addTag('auth', 'Authentication endpoints')
+    .addTag('users', 'User management')
+    .addTag('companies', 'Company management')
+    .addTag('departments', 'Department management')
+    .addTag('projects', 'Project management')
+    .addTag('sub-projects', 'Task/Sub-project management')
+    .addTag('time-tracking', 'Time tracking with cross-device sync')
+    .addTag('sops', 'Standard Operating Procedures')
+    .addTag('chat', 'Project chat rooms')
+    .addTag('notifications', 'User notifications')
+    .addTag('activity-logs', 'Activity audit logs')
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(process.env.PORT ?? 6000);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  // const port = process.env.PORT ?? 3000;
+  const port = 4000;
+  await app.listen(port);
+
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`);
 }
+
 bootstrap();

@@ -1,0 +1,371 @@
+// prisma/schema.prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  USER
+  QC_ADMIN
+  COMPANY_ADMIN
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectMemberRole {
+  MEMBER
+  QC_ADMIN
+  LEAD
+}
+
+enum SubProjectStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
+enum SopType {
+  VIDEO
+  DOCUMENT
+  PDF
+  LINK
+  IMAGE
+}
+
+enum SopStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  PROJECT_ASSIGNMENT
+  TASK_ASSIGNMENT
+  SOP_APPROVAL
+  SOP_REJECTION
+  CHAT_MESSAGE
+  DEPARTMENT_ASSIGNMENT
+  ROLE_CHANGE
+  SYSTEM
+}
+
+enum ActivityType {
+  USER_LOGIN
+  USER_LOGOUT
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  SOP_CREATED
+  SOP_APPROVED
+  TIME_TRACKING_START
+  TIME_TRACKING_END
+  DEPARTMENT_CREATED
+  USER_ROLE_CHANGED
+}
+
+// Models
+model Company {
+  id                 String             @id @default(uuid())
+  name               String             @unique
+  companyCode        String             @unique
+  logo               String?
+  address            String?
+  phone              String?
+  website            String?
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  users        User[]
+  departments  Department[]
+  projects     Project[]
+  sops         Sop[]
+  activityLogs ActivityLog[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String
+  firstName    String
+  lastName     String
+  role         UserRole  @default(USER)
+  avatar       String?
+  phone        String?
+  isActive     Boolean   @default(true)
+  companyId    String
+  departmentId String?
+  startDate    DateTime?
+  endDate      DateTime?
+  points       Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company             Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department          Department?      @relation(fields: [departmentId], references: [id])
+  projectMemberships  ProjectMember[]
+  timeTrackings       TimeTracking[]
+  sopsCreated         Sop[]            @relation("SopCreator")
+  sopsApproved        Sop[]            @relation("SopApprover")
+  notifications       Notification[]
+  chatRoomsCreated    ChatRoom[]
+  chatRoomMembers     ChatRoomMember[]
+  chatMessages        ChatMessage[]
+  subProjectsCreated  SubProject[]     @relation("SubProjectCreator")
+  subProjectsAssigned SubProject[]     @relation("SubProjectAssignee")
+  activityLogs        ActivityLog[]
+  departmentsLed      Department[]     @relation("DepartmentLead")
+  projectsLed         Project[]
+
+  @@index([companyId])
+  @@index([email])
+  @@map("users")
+}
+
+model Department {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  tag         String?
+  companyId   String
+  leadId      String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    User?   @relation("DepartmentLead", fields: [leadId], references: [id])
+  users   User[]
+
+  @@index([companyId])
+  @@map("departments")
+}
+
+model Project {
+  id                      String        @id @default(uuid())
+  name                    String
+  description             String?
+  budget                  Decimal?      @db.Decimal(10, 2)
+  status                  ProjectStatus @default(PLANNING)
+  companyId               String
+  projectLeadId           String?
+  startDate               DateTime?
+  endDate                 DateTime?
+  screenMonitoringEnabled Boolean       @default(false)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  projectLead User?           @relation(fields: [projectLeadId], references: [id])
+  members     ProjectMember[]
+  subProjects SubProject[]
+  chatRooms   ChatRoom[]
+
+  @@index([companyId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id           String            @id @default(uuid())
+  projectId    String
+  userId       String
+  role         ProjectMemberRole @default(MEMBER)
+  pointsEarned Int               @default(0)
+  joinedAt     DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model SubProject {
+  id             String           @id @default(uuid())
+  title          String
+  description    String?
+  projectId      String
+  assignedToId   String?
+  createdById    String
+  status         SubProjectStatus @default(TODO)
+  pointsValue    Int              @default(0)
+  estimatedHours Int?
+  dueDate        DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedTo    User?          @relation("SubProjectAssignee", fields: [assignedToId], references: [id])
+  createdBy     User           @relation("SubProjectCreator", fields: [createdById], references: [id])
+  timeTrackings TimeTracking[]
+
+  @@index([projectId])
+  @@index([assignedToId])
+  @@map("sub_projects")
+}
+
+model TimeTracking {
+  id              String    @id @default(uuid())
+  userId          String
+  subProjectId    String
+  startTime       DateTime
+  endTime         DateTime?
+  durationMinutes Int       @default(0)
+  notes           String?
+  screenshots     String[]
+  isActive        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subProject SubProject @relation(fields: [subProjectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subProjectId])
+  @@index([isActive])
+  @@map("time_trackings")
+}
+
+model Sop {
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  type            SopType
+  fileUrl         String
+  thumbnailUrl    String?
+  duration        Int?
+  status          SopStatus @default(PENDING_APPROVAL)
+  companyId       String
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  viewCount       Int       @default(0)
+  tags            String[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("SopCreator", fields: [createdById], references: [id])
+  approvedBy User?   @relation("SopApprover", fields: [approvedById], references: [id])
+
+  @@index([companyId])
+  @@index([status])
+  @@index([type])
+  @@map("sops")
+}
+
+model ChatRoom {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  projectId   String
+  createdById String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User             @relation(fields: [createdById], references: [id])
+  members   ChatRoomMember[]
+  messages  ChatMessage[]
+
+  @@index([projectId])
+  @@map("chat_rooms")
+}
+
+model ChatRoomMember {
+  id         String   @id @default(uuid())
+  chatRoomId String
+  userId     String
+  isQcAdmin  Boolean  @default(false)
+  joinedAt   DateTime @default(now())
+
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatRoomId, userId])
+  @@index([chatRoomId])
+  @@index([userId])
+  @@map("chat_room_members")
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  chatRoomId String
+  senderId   String
+  content    String
+  isEdited   Boolean  @default(false)
+  isDeleted  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  sender   User     @relation(fields: [senderId], references: [id])
+
+  @@index([chatRoomId])
+  @@index([senderId])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  metadata  Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id           String       @id @default(uuid())
+  companyId    String
+  userId       String?
+  activityType ActivityType
+  description  String
+  metadata     Json?
+  ipAddress    String?
+  createdAt    DateTime     @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([activityType])
+  @@map("activity_logs")
+}

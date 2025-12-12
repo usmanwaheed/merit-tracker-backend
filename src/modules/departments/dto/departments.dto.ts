@@ -1,73 +1,73 @@
-
 // src/modules/departments/dto/departments.dto.ts
-import { IsString, IsOptional, IsArray, IsDateString, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional, IsUUID, IsArray, IsDateString, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDepartmentDto {
-    @ApiProperty()
+    @ApiProperty({ example: 'Engineering' })
     @IsString()
+    @IsNotEmpty()
     name: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional({ example: 'Software development team' })
     @IsOptional()
+    @IsString()
     description?: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional({ example: 'engineering' })
     @IsOptional()
+    @IsString()
     tag?: string;
 
-    @ApiProperty({ required: false })
-    @IsUUID()
+    @ApiPropertyOptional({ description: 'UUID of the department lead' })
     @IsOptional()
+    @IsUUID()
     leadId?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    startDate?: Date;
+    @IsDateString()
+    startDate?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    endDate?: Date;
+    @IsDateString()
+    endDate?: string;
 }
 
 export class UpdateDepartmentDto {
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional({ example: 'Engineering' })
     @IsOptional()
+    @IsString()
     name?: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional({ example: 'Software development team' })
     @IsOptional()
+    @IsString()
     description?: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional({ example: 'engineering' })
     @IsOptional()
+    @IsString()
     tag?: string;
 
-    @ApiProperty({ required: false })
-    @IsUUID()
+    @ApiPropertyOptional({ description: 'UUID of the department lead' })
     @IsOptional()
+    @IsUUID()
     leadId?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    startDate?: Date;
+    @IsDateString()
+    startDate?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    endDate?: Date;
+    @IsDateString()
+    endDate?: string;
 }
 
 export class AssignUsersDto {
-    @ApiProperty({ type: [String] })
+    @ApiProperty({ type: [String], description: 'Array of user UUIDs to assign' })
     @IsArray()
     @IsUUID('4', { each: true })
     userIds: string[];

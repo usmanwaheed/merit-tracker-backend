@@ -1,29 +1,33 @@
 // src/modules/users/users.service.ts
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User, UserRole } from '../../entities/user.entity';
+import { PrismaService } from '../../prisma/prisma.service';
+import { User, UserRole } from '@prisma/client';
 import { UpdateUserDto, UpdateUserRoleDto } from './dto/users.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectRepository(User)
-        private usersRepository: Repository<User>,
-    ) { }
+    constructor(private prisma: PrismaService) { }
 
     async findAll(companyId: string): Promise<User[]> {
-        return this.usersRepository.find({
+        return this.prisma.user.findMany({
             where: { companyId },
-            relations: ['department'],
-            order: { createdAt: 'DESC' },
+            include: { department: true },
+            orderBy: { createdAt: 'desc' },
         });
     }
 
+    // src/modules/users/users.service.ts - Update findOne method to be more specific
     async findOne(id: string, companyId: string): Promise<User> {
-        const user = await this.usersRepository.findOne({
-            where: { id, companyId },
-            relations: ['department', 'company'],
+        const user = await this.prisma.user.findFirst({
+            where: {
+                id,
+                companyId,
+                isActive: true // Add this to only find active users
+            },
+            include: {
+                department: true,
+                company: true,
+            },
         });
 
         if (!user) {
@@ -34,12 +38,13 @@ export class UsersService {
     }
 
     async findByEmail(email: string): Promise<User | null> {
-        return this.usersRepository.findOne({
+        return this.prisma.user.findUnique({
             where: { email },
-            relations: ['company'],
+            include: { company: true },
         });
     }
 
+    // src/modules/users/users.service.ts - Updated update method
     async update(id: string, updateDto: UpdateUserDto, currentUser: User): Promise<User> {
         const user = await this.findOne(id, currentUser.companyId);
 
@@ -48,8 +53,25 @@ export class UsersService {
             throw new ForbiddenException('You can only update your own profile');
         }
 
-        Object.assign(user, updateDto);
-        return this.usersRepository.save(user);
+        // Validate department exists if departmentId is provided
+        if (updateDto.departmentId) {
+            const department = await this.prisma.department.findFirst({
+                where: {
+                    id: updateDto.departmentId,
+                    companyId: currentUser.companyId
+                },
+            });
+
+            if (!department) {
+                throw new NotFoundException('Department not found in your company');
+            }
+        }
+
+        return this.prisma.user.update({
+            where: { id },
+            data: updateDto,
+            include: { department: true, company: true },
+        });
     }
 
     async updateRole(id: string, updateDto: UpdateUserRoleDto, currentUser: User): Promise<User> {
@@ -65,8 +87,11 @@ export class UsersService {
             throw new ForbiddenException('Cannot change company admin role');
         }
 
-        user.role = updateDto.role;
-        return this.usersRepository.save(user);
+        return this.prisma.user.update({
+            where: { id },
+            data: { role: updateDto.role },
+            include: { department: true, company: true },
+        });
     }
 
     async deactivate(id: string, currentUser: User): Promise<User> {
@@ -87,8 +112,11 @@ export class UsersService {
             throw new ForbiddenException('Cannot deactivate company admin');
         }
 
-        user.isActive = false;
-        return this.usersRepository.save(user);
+        return this.prisma.user.update({
+            where: { id },
+            data: { isActive: false },
+            include: { department: true, company: true },
+        });
     }
 
     async activate(id: string, currentUser: User): Promise<User> {
@@ -97,14 +125,18 @@ export class UsersService {
         }
 
         const user = await this.findOne(id, currentUser.companyId);
-        user.isActive = true;
-        return this.usersRepository.save(user);
+
+        return this.prisma.user.update({
+            where: { id },
+            data: { isActive: true },
+            include: { department: true, company: true },
+        });
     }
 
     async getLeaderboard(companyId: string): Promise<User[]> {
-        return this.usersRepository.find({
+        return this.prisma.user.findMany({
             where: { companyId, isActive: true },
-            order: { points: 'DESC' },
+            orderBy: { points: 'desc' },
             take: 50,
         });
     }

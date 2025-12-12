@@ -1,12 +1,11 @@
-
 // src/modules/companies/companies.controller.ts
 import { Controller, Get, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../../entities/user.entity';
+// import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateCompanyDto } from './dto/companies.dto';
+import { CurrentUser } from '../auth/guards';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -17,14 +16,14 @@ export class CompaniesController {
 
     @Get('my-company')
     @ApiOperation({ summary: 'Get current user company' })
-    async getMyCompany(@CurrentUser() user: User) {
-        return this.companiesService.findOne(user.companyId);
+    async getMyCompany(@CurrentUser('companyId') companyId: string) {
+        return this.companiesService.findOne(companyId);
     }
 
     @Get('my-company/stats')
     @ApiOperation({ summary: 'Get company statistics' })
-    async getCompanyStats(@CurrentUser() user: User) {
-        return this.companiesService.getCompanyStats(user.companyId);
+    async getCompanyStats(@CurrentUser('companyId') companyId: string) {
+        return this.companiesService.getCompanyStats(companyId);
     }
 
     @Put(':id')
@@ -32,8 +31,8 @@ export class CompaniesController {
     async update(
         @Param('id') id: string,
         @Body() updateDto: UpdateCompanyDto,
-        @CurrentUser() user: User,
+        @CurrentUser('role') currentUserRole: string,
     ) {
-        return this.companiesService.update(id, updateDto, user);
+        return this.companiesService.update(id, updateDto, currentUserRole as any);
     }
 }

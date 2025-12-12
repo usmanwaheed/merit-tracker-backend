@@ -1,12 +1,11 @@
-
 // src/modules/users/users.controller.ts
 import { Controller, Get, Put, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../../entities/user.entity';
+// import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserDto, UpdateUserRoleDto } from './dto/users.dto';
+import { CurrentUser } from '../auth/guards';
 
 @ApiTags('users')
 @Controller('users')
@@ -17,20 +16,20 @@ export class UsersController {
 
     @Get()
     @ApiOperation({ summary: 'Get all users in company' })
-    async findAll(@CurrentUser() user: User) {
-        return this.usersService.findAll(user.companyId);
+    async findAll(@CurrentUser('companyId') companyId: string) {
+        return this.usersService.findAll(companyId);
     }
 
     @Get('leaderboard')
     @ApiOperation({ summary: 'Get company leaderboard' })
-    async getLeaderboard(@CurrentUser() user: User) {
-        return this.usersService.getLeaderboard(user.companyId);
+    async getLeaderboard(@CurrentUser('companyId') companyId: string) {
+        return this.usersService.getLeaderboard(companyId);
     }
 
     @Get(':id')
     @ApiOperation({ summary: 'Get user by ID' })
-    async findOne(@Param('id') id: string, @CurrentUser() user: User) {
-        return this.usersService.findOne(id, user.companyId);
+    async findOne(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
+        return this.usersService.findOne(id, companyId);
     }
 
     @Put(':id')
@@ -38,9 +37,10 @@ export class UsersController {
     async update(
         @Param('id') id: string,
         @Body() updateDto: UpdateUserDto,
-        @CurrentUser() user: User,
+        @CurrentUser() currentUser: any, // Get the full user object
     ) {
-        return this.usersService.update(id, updateDto, user);
+        // No need to create a minimal object, pass the current user directly
+        return this.usersService.update(id, updateDto, currentUser);
     }
 
     @Patch(':id/role')
@@ -48,20 +48,26 @@ export class UsersController {
     async updateRole(
         @Param('id') id: string,
         @Body() updateDto: UpdateUserRoleDto,
-        @CurrentUser() user: User,
+        @CurrentUser() currentUser: any,
     ) {
-        return this.usersService.updateRole(id, updateDto, user);
+        return this.usersService.updateRole(id, updateDto, currentUser);
     }
 
     @Patch(':id/deactivate')
     @ApiOperation({ summary: 'Deactivate user' })
-    async deactivate(@Param('id') id: string, @CurrentUser() user: User) {
-        return this.usersService.deactivate(id, user);
+    async deactivate(
+        @Param('id') id: string,
+        @CurrentUser() currentUser: any,
+    ) {
+        return this.usersService.deactivate(id, currentUser);
     }
 
     @Patch(':id/activate')
     @ApiOperation({ summary: 'Activate user' })
-    async activate(@Param('id') id: string, @CurrentUser() user: User) {
-        return this.usersService.activate(id, user);
+    async activate(
+        @Param('id') id: string,
+        @CurrentUser() currentUser: any,
+    ) {
+        return this.usersService.activate(id, currentUser);
     }
 }

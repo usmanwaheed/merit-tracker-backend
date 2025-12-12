@@ -1,87 +1,133 @@
 // src/modules/projects/dto/projects.dto.ts
-import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsBoolean, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { ProjectStatus } from '../../../entities/project.entity';
+import { IsString, IsOptional, IsUUID, IsArray, IsDateString, IsNotEmpty, IsEnum, IsNumber, IsBoolean } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ProjectStatus, ProjectMemberRole } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateProjectDto {
-    @ApiProperty()
+    @ApiProperty({ example: 'Website Redesign' })
     @IsString()
+    @IsNotEmpty()
     name: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsString()
     description?: string;
 
-    @ApiProperty({ required: false })
-    @IsNumber()
+    @ApiPropertyOptional({ example: 50000 })
     @IsOptional()
+    @IsNumber()
+    @Type(() => Number)
     budget?: number;
 
-    @ApiProperty({ enum: ProjectStatus, required: false })
-    @IsEnum(ProjectStatus)
+    @ApiPropertyOptional({ enum: ProjectStatus })
     @IsOptional()
+    @IsEnum(ProjectStatus)
     status?: ProjectStatus;
 
-    @ApiProperty({ required: false })
-    @IsUUID()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsUUID()
     projectLeadId?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    startDate?: Date;
-
-    @ApiProperty({ required: false })
     @IsDateString()
-    @IsOptional()
-    endDate?: Date;
+    startDate?: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsDateString()
+    endDate?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
     @IsBoolean()
-    @IsOptional()
     screenMonitoringEnabled?: boolean;
+
+    @ApiPropertyOptional({ type: [String] })
+    @IsOptional()
+    @IsArray()
+    @IsUUID('4', { each: true })
+    memberIds?: string[];
 }
 
 export class UpdateProjectDto {
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsString()
     name?: string;
 
-    @ApiProperty({ required: false })
-    @IsString()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsString()
     description?: string;
 
-    @ApiProperty({ required: false })
-    @IsNumber()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsNumber()
+    @Type(() => Number)
     budget?: number;
 
-    @ApiProperty({ enum: ProjectStatus, required: false })
-    @IsEnum(ProjectStatus)
+    @ApiPropertyOptional({ enum: ProjectStatus })
     @IsOptional()
+    @IsEnum(ProjectStatus)
     status?: ProjectStatus;
 
-    @ApiProperty({ required: false })
-    @IsUUID()
+    @ApiPropertyOptional()
     @IsOptional()
+    @IsUUID()
     projectLeadId?: string;
 
-    @ApiProperty({ required: false })
-    @IsDateString()
+    @ApiPropertyOptional()
     @IsOptional()
-    startDate?: Date;
-
-    @ApiProperty({ required: false })
     @IsDateString()
-    @IsOptional()
-    endDate?: Date;
+    startDate?: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsDateString()
+    endDate?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
     @IsBoolean()
-    @IsOptional()
     screenMonitoringEnabled?: boolean;
+}
+
+export class AddProjectMembersDto {
+    @ApiProperty({ type: [String] })
+    @IsArray()
+    @IsUUID('4', { each: true })
+    userIds: string[];
+}
+
+export class RemoveProjectMembersDto {
+    @ApiProperty({ type: [String] })
+    @IsArray()
+    @IsUUID('4', { each: true })
+    userIds: string[];
+}
+
+export class UpdateMemberRoleDto {
+    @ApiProperty()
+    @IsUUID()
+    userId: string;
+
+    @ApiProperty({ enum: ProjectMemberRole })
+    @IsEnum(ProjectMemberRole)
+    role: ProjectMemberRole;
+}
+
+export class ProjectQueryDto {
+    @ApiPropertyOptional({ enum: ProjectStatus })
+    @IsOptional()
+    @IsEnum(ProjectStatus)
+    status?: ProjectStatus;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    search?: string;
 }

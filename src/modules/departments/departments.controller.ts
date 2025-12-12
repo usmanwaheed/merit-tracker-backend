@@ -3,9 +3,9 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Patch } fro
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../../entities/user.entity';
+// import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateDepartmentDto, UpdateDepartmentDto, AssignUsersDto } from './dto/departments.dto';
+import { CurrentUser } from '../auth/guards';
 
 @ApiTags('departments')
 @Controller('departments')
@@ -16,20 +16,24 @@ export class DepartmentsController {
 
     @Post()
     @ApiOperation({ summary: 'Create new department' })
-    async create(@Body() createDto: CreateDepartmentDto, @CurrentUser() user: User) {
-        return this.departmentsService.create(createDto, user);
+    async create(
+        @Body() createDto: CreateDepartmentDto,
+        @CurrentUser('role') currentUserRole: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.departmentsService.create(createDto, currentUserRole as any, companyId);
     }
 
     @Get()
     @ApiOperation({ summary: 'Get all departments in company' })
-    async findAll(@CurrentUser() user: User) {
-        return this.departmentsService.findAll(user.companyId);
+    async findAll(@CurrentUser('companyId') companyId: string) {
+        return this.departmentsService.findAll(companyId);
     }
 
     @Get(':id')
     @ApiOperation({ summary: 'Get department by ID' })
-    async findOne(@Param('id') id: string, @CurrentUser() user: User) {
-        return this.departmentsService.findOne(id, user.companyId);
+    async findOne(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
+        return this.departmentsService.findOne(id, companyId);
     }
 
     @Put(':id')
@@ -37,9 +41,10 @@ export class DepartmentsController {
     async update(
         @Param('id') id: string,
         @Body() updateDto: UpdateDepartmentDto,
-        @CurrentUser() user: User,
+        @CurrentUser('role') currentUserRole: string,
+        @CurrentUser('companyId') companyId: string,
     ) {
-        return this.departmentsService.update(id, updateDto, user);
+        return this.departmentsService.update(id, updateDto, currentUserRole as any, companyId);
     }
 
     @Patch(':id/assign-users')
@@ -47,14 +52,19 @@ export class DepartmentsController {
     async assignUsers(
         @Param('id') id: string,
         @Body() assignDto: AssignUsersDto,
-        @CurrentUser() user: User,
+        @CurrentUser('role') currentUserRole: string,
+        @CurrentUser('companyId') companyId: string,
     ) {
-        return this.departmentsService.assignUsers(id, assignDto, user);
+        return this.departmentsService.assignUsers(id, assignDto, currentUserRole as any, companyId);
     }
 
     @Delete(':id')
     @ApiOperation({ summary: 'Delete department' })
-    async delete(@Param('id') id: string, @CurrentUser() user: User) {
-        return this.departmentsService.delete(id, user);
+    async delete(
+        @Param('id') id: string,
+        @CurrentUser('role') currentUserRole: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.departmentsService.delete(id, currentUserRole as any, companyId);
     }
 }
