@@ -146,6 +146,19 @@ model User {
   @@map("users")
 }
 
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("super_admins")
+}
+
 model Department {
   id          String    @id @default(uuid())
   name        String

@@ -16,6 +16,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
 import { SubscriptionGuard } from './modules/auth/guards';
+import { SuperadminModule } from './modules/superadmin/superadmin.module';
 // import { SubscriptionGuard } from './common/guards/subscription.guard';
 
 @Module({
@@ -34,6 +35,7 @@ import { SubscriptionGuard } from './modules/auth/guards';
     ChatModule,
     NotificationsModule,
     ActivityLogsModule,
+    SuperadminModule,
   ],
   providers: [
     {
@@ -42,4 +44,4 @@ import { SubscriptionGuard } from './modules/auth/guards';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

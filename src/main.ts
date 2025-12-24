@@ -9,7 +9,7 @@ async function bootstrap() {
 
   // Split the FRONTEND_URL string into an array
   const frontendUrls = process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
     : ['http://localhost:3000'];
 
   app.enableCors({
@@ -41,6 +41,7 @@ async function bootstrap() {
     .addTag('chat', 'Project chat rooms')
     .addTag('notifications', 'User notifications')
     .addTag('activity-logs', 'Activity audit logs')
+    .addTag('superadmin-auth', 'Superadmin authentication')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -50,8 +51,13 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`);
+  console.log(
+    `📚 Swagger docs available at: http://localhost:${port}/api/docs`,
+  );
   console.log(`🌐 Allowed frontend origins: ${frontendUrls.join(', ')}`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to start application:', error);
+  process.exit(1);
+});
