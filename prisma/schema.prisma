@@ -22,6 +22,12 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum SubscriptionPlan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
 enum ProjectStatus {
   PLANNING
   IN_PROGRESS
@@ -92,9 +98,11 @@ model Company {
   phone              String?
   website            String?
   subscriptionStatus SubscriptionStatus @default(TRIAL)
+  subscriptionPlan   SubscriptionPlan   @default(STARTER)
   trialEndsAt        DateTime?
   subscriptionEndsAt DateTime?
   isActive           Boolean            @default(true)
+  maxUsers           Int                @default(5)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -157,6 +165,62 @@ model SuperAdmin {
   updatedAt DateTime @updatedAt
 
   @@map("super_admins")
+}
+
+model SubscriptionPlan {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  monthlyPrice Int
+  yearlyPrice  Int
+  userLimit    Int
+  features     String[]
+  isPopular    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("subscription_plans")
+}
+
+model SubscriptionTransaction {
+  id            String   @id @default(uuid())
+  companyId     String
+  planName      String
+  amount        Int
+  status        String
+  billingCycle  String
+  paymentMethod String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("subscription_transactions")
+}
+
+model PlatformSetting {
+  id                     String   @id @default(uuid())
+  platformName           String
+  supportEmail           String
+  platformDescription    String?
+  defaultTimezone        String
+  defaultCurrency        String
+  stripePublicKey        String?
+  stripeSecretKey        String?
+  trialDays              Int       @default(14)
+  autoRetryFailedPayments Boolean  @default(true)
+  autoInvoiceGeneration  Boolean  @default(true)
+  primaryColor           String    @default("#6366f1")
+  theme                  String    @default("system")
+  logoUrl                String?
+  faviconUrl             String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@map("platform_settings")
 }
 
 model Department {

@@ -42,6 +42,13 @@ async function bootstrap() {
     .addTag('notifications', 'User notifications')
     .addTag('activity-logs', 'Activity audit logs')
     .addTag('superadmin-auth', 'Superadmin authentication')
+    .addTag('superadmin-companies', 'Superadmin company management')
+    .addTag('superadmin-plans', 'Superadmin plan management')
+    .addTag('superadmin-users', 'Superadmin user management')
+    .addTag('superadmin-subscriptions', 'Superadmin subscription management')
+    .addTag('superadmin-transactions', 'Superadmin transaction management')
+    .addTag('superadmin-analytics', 'Superadmin analytics')
+    .addTag('superadmin-settings', 'Superadmin platform settings')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
